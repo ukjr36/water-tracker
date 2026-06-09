@@ -66,6 +66,11 @@ body{background:var(--bg) !important;color:var(--text);display:flex;flex-directi
 .undo-btn:hover{opacity:1}
 .undo-btn:active{transform:scale(.95)}
 .undo-btn:disabled{opacity:.3;cursor:default}
+.pattern-switch{display:flex;gap:8px;margin-bottom:12px}
+.pattern-btn{flex:1;background:var(--btn-bg);border:1px solid var(--btn-border);color:var(--text-sub);
+  font-size:.78rem;font-weight:700;padding:8px 0;border-radius:10px;cursor:pointer;transition:all .2s}
+.pattern-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.pattern-btn:active{transform:scale(.96)}
 .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .add-btn{background:var(--btn-bg);border:1px solid var(--btn-border);color:var(--text);
   font-size:1.05rem;font-weight:700;padding:18px 0;border-radius:14px;cursor:pointer;
@@ -125,12 +130,11 @@ body{background:var(--bg) !important;color:var(--text);display:flex;flex-directi
   </div>
   <div class="ios-hint" id="iosHint">📲 ホーム画面に追加するには<br>Safari の <strong>共有ボタン</strong> →「<strong>ホーム画面に追加</strong>」をタップ</div>
   <div class="undo-row"><button class="undo-btn" id="undoBtn" onclick="undoLast()" disabled>↩ 元に戻す</button></div>
-  <div class="btn-grid">
-    <button class="add-btn" onclick="addWater(100)">100 ml</button>
-    <button class="add-btn" onclick="addWater(200)">200 ml</button>
-    <button class="add-btn" onclick="addWater(600)">600 ml</button>
-    <button class="add-btn" onclick="addWater(1000)">1000 ml</button>
+  <div class="pattern-switch">
+    <button class="pattern-btn active" id="pat1" onclick="switchPattern(1)">A: 100/150/200/600</button>
+    <button class="pattern-btn" id="pat2" onclick="switchPattern(2)">B: 100/150/500/720</button>
   </div>
+  <div class="btn-grid" id="btnGrid"></div>
   <div class="chart-card">
     <div class="chart-title">過去7日間</div>
     <div class="bars" id="bars"></div>
@@ -144,7 +148,8 @@ body{background:var(--bg) !important;color:var(--text);display:flex;flex-directi
 <div class="toast" id="toast"></div>
 <script>
 const GOAL=2000,CIRC=2*Math.PI*88;
-let currentDate=todayStr(),history={},themeMode='dark';
+const PATTERNS={1:[100,150,200,600],2:[100,150,500,720]};
+let currentDate=todayStr(),history={},themeMode='dark',currentPattern=1;
 
 function todayStr(){
   const d=new Date();
@@ -160,8 +165,24 @@ function loadData(){try{const r=localStorage.getItem('water-app-data');history=r
 function saveData(){try{localStorage.setItem('water-app-data',JSON.stringify(history))}catch(e){}}
 function loadTheme(){try{themeMode=localStorage.getItem('water-app-theme')||'dark'}catch(e){themeMode='dark'}applyTheme(themeMode)}
 function saveTheme(t){try{localStorage.setItem('water-app-theme',t)}catch(e){}}
+function loadPattern(){try{currentPattern=parseInt(localStorage.getItem('water-app-pattern'))||1}catch(e){currentPattern=1}}
+function savePattern(p){try{localStorage.setItem('water-app-pattern',p)}catch(e){}}
 function applyTheme(t){themeMode=t;if(t==='light'){document.body.classList.add('light');document.documentElement.classList.add('light-html');document.documentElement.style.colorScheme='light'}else{document.body.classList.remove('light');document.documentElement.classList.remove('light-html');document.documentElement.style.colorScheme='dark'}document.getElementById('themeBtn').textContent=t==='light'?'☀️':'🌙';document.querySelector('meta[name=theme-color]').content=t==='light'?'#f0f4f8':'#0a1628'}
 function toggleTheme(){applyTheme(themeMode==='light'?'dark':'light');saveTheme(themeMode)}
+function switchPattern(p){
+  currentPattern=p;savePattern(p);
+  document.getElementById('pat1').classList.toggle('active',p===1);
+  document.getElementById('pat2').classList.toggle('active',p===2);
+  renderButtons();
+}
+function renderButtons(){
+  const grid=document.getElementById('btnGrid');grid.innerHTML='';
+  PATTERNS[currentPattern].forEach(ml=>{
+    const btn=document.createElement('button');btn.className='add-btn';
+    btn.textContent=`${ml} ml`;btn.onclick=()=>addWater(ml);
+    grid.appendChild(btn);
+  });
+}
 function changeDay(delta){
   const parts=currentDate.split('-');
   const d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
@@ -197,7 +218,7 @@ function renderBars(){
 const canvas=document.getElementById('waveCanvas'),ctx=canvas.getContext('2d');let waveColor='blue',wavePhase=0;
 function drawWave(){const total=getTotal(currentDate),fillRatio=Math.min(total/GOAL,1),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);if(fillRatio<=0){requestAnimationFrame(drawWave);return}const waterH=fillRatio*h,baseY=h-waterH;wavePhase+=0.03;const colors={blue:['rgba(59,130,246,0.25)','rgba(59,130,246,0.15)'],green:['rgba(34,197,94,0.25)','rgba(34,197,94,0.15)'],red:['rgba(239,68,68,0.25)','rgba(239,68,68,0.15)']};const[c1,c2]=colors[waveColor]||colors.blue;ctx.beginPath();ctx.moveTo(0,h);for(let x=0;x<=w;x++){ctx.lineTo(x,baseY+Math.sin(x*0.04+wavePhase)*6+Math.sin(x*0.02+wavePhase*0.7)*4)}ctx.lineTo(w,h);ctx.closePath();ctx.fillStyle=c1;ctx.fill();ctx.beginPath();ctx.moveTo(0,h);for(let x=0;x<=w;x++){ctx.lineTo(x,baseY+Math.sin(x*0.035+wavePhase*1.3+1)*5+Math.sin(x*0.025+wavePhase*0.5+2)*3+4)}ctx.lineTo(w,h);ctx.closePath();ctx.fillStyle=c2;ctx.fill();requestAnimationFrame(drawWave)}
 function setupInstall(){const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);const isStandalone=window.navigator.standalone||window.matchMedia('(display-mode: standalone)').matches;if(isStandalone||!isIOS)return;document.getElementById('iosHint').classList.add('visible')}
-function init(){loadData();loadTheme();updateUI();drawWave();setupInstall()}
+function init(){loadData();loadTheme();loadPattern();switchPattern(currentPattern);updateUI();drawWave();setupInstall()}
 init();
 </script>
 </body>
